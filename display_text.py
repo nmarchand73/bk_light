@@ -1,12 +1,16 @@
 import argparse
 import asyncio
-from io import BytesIO
+from dataclasses import replace
 from pathlib import Path
+from typing import Optional
 from PIL import Image, ImageDraw, ImageFont
-from display_session import BleDisplaySession
+from config import AppConfig, load_config, text_options
+from panel_manager import PanelManager
 
 
-def parse_color(value: str) -> tuple[int, int, int]:
+def parse_color(value: Optional[str]) -> Optional[tuple[int, int, int]]:
+    if value is None:
+        return None
     cleaned = value.replace("#", "").replace(" ", "")
     if "," in cleaned:
         parts = cleaned.split(",")
@@ -16,7 +20,7 @@ def parse_color(value: str) -> tuple[int, int, int]:
     raise ValueError("Invalid color")
 
 
-def load_font(path: Path | None, size: int) -> ImageFont.ImageFont:
+def load_font(path: Optional[Path], size: int) -> ImageFont.ImageFont:
     if path is None:
         return ImageFont.load_default()
     try:
@@ -25,54 +29,73 @@ def load_font(path: Path | None, size: int) -> ImageFont.ImageFont:
         return ImageFont.load_default()
 
 
-def build_png(text: str, color: tuple[int, int, int], background: tuple[int, int, int], font_path: Path | None, size: int, spacing: int) -> bytes:
-    image = Image.new("RGB", (32, 32), background)
+def build_text_image(
+    canvas: tuple[int, int],
+    text: str,
+    color: tuple[int, int, int],
+    background: tuple[int, int, int],
+    font_path: Optional[Path],
+    size: int,
+    spacing: int,
+) -> Image.Image:
+    image = Image.new("RGB", canvas, background)
     draw = ImageDraw.Draw(image)
     font = load_font(font_path, size)
     formatted = text.replace("\\n", "\n")
     bbox = draw.multiline_textbbox((0, 0), formatted, font=font, spacing=spacing, align="center")
     width = bbox[2] - bbox[0]
     height = bbox[3] - bbox[1]
-    position = ((32 - width) / 2, (32 - height) / 2)
-    draw.multiline_text(position, formatted, fill=color, font=font, spacing=spacing, align="center")
-    buffer = BytesIO()
-    image.save(buffer, format="PNG", optimize=False)
-    return buffer.getvalue()
+    origin = ((canvas[0] - width) / 2, (canvas[1] - height) / 2)
+    draw.multiline_text(origin, formatted, fill=color, font=font, spacing=spacing, align="center")
+    return image
 
 
-async def push_text(text: str, color: tuple[int, int, int], background: tuple[int, int, int], font_path: Path | None, size: int, spacing: int, address: str | None) -> None:
-    png_bytes = build_png(text, color, background, font_path, size, spacing)
-    try:
-        async with BleDisplaySession(address) as session:
-            await session.send_png(png_bytes)
-        print("DONE")
-    except Exception as error:
-        print("ERROR", str(error))
+async def display_text(config: AppConfig, message: str, preset_name: str, overrides: dict[str, Optional[str]]) -> None:
+    preset = text_options(config, preset_name, overrides)
+    color = parse_color(overrides.get("color")) or parse_color(preset.color)
+    background = parse_color(overrides.get("background")) or parse_color(preset.background)
+    font_path = Path(overrides["font"]) if overrides.get("font") else Path(preset.font) if preset.font else None
+    size = overrides.get("size") or preset.size
+    spacing = overrides.get("spacing") or preset.spacing
+    size = int(size)
+    spacing = int(spacing)
+    async with PanelManager(config) as manager:
+        canvas = manager.canvas_size
+        image = build_text_image(canvas, message, color, background, font_path, size, spacing)
+        await manager.send_image(image, delay=0.15)
+        await asyncio.sleep(0.2)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("text")
-    parser.add_argument("--color", default="#FF0000")
-    parser.add_argument("--background", default="#000000")
-    parser.add_argument("--font", type=Path)
-    parser.add_argument("--size", type=int, default=16)
-    parser.add_argument("--spacing", type=int, default=1)
+    parser.add_argument("--config", type=Path)
     parser.add_argument("--address")
+    parser.add_argument("--preset")
+    parser.add_argument("--color")
+    parser.add_argument("--background")
+    parser.add_argument("--font", type=Path)
+    parser.add_argument("--size", type=int)
+    parser.add_argument("--spacing", type=int)
     return parser.parse_args()
+
+
+def build_override_map(args: argparse.Namespace) -> dict[str, Optional[str]]:
+    return {
+        "color": args.color,
+        "background": args.background,
+        "font": str(args.font) if args.font else None,
+        "size": args.size,
+        "spacing": args.spacing,
+    }
 
 
 if __name__ == "__main__":
     args = parse_args()
-    asyncio.run(
-        push_text(
-            args.text,
-            parse_color(args.color),
-            parse_color(args.background),
-            args.font,
-            args.size,
-            args.spacing,
-            args.address,
-        )
-    )
+    config = load_config(args.config)
+    if args.address:
+        config.device = replace(config.device, address=args.address)
+    preset_name = args.preset or config.runtime.preset or "default"
+    overrides = build_override_map(args)
+    asyncio.run(display_text(config, args.text, preset_name, overrides))
 

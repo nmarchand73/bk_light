@@ -1,7 +1,10 @@
 import asyncio
 import binascii
 import os
+from io import BytesIO
+from typing import Optional
 from bleak import BleakClient
+from PIL import Image, ImageEnhance
 
 DEFAULT_ADDRESS = os.getenv("BK_LIGHT_ADDRESS")
 UUID_WRITE = "0000fa02-0000-1000-8000-00805f9b34fb"
@@ -33,11 +36,24 @@ def build_frame(png_bytes: bytes) -> bytes:
     return bytes(frame)
 
 
+def adjust_image(png_bytes: bytes, rotation: int, brightness: float) -> bytes:
+    image = Image.open(BytesIO(png_bytes)).convert("RGB")
+    if rotation:
+        image = image.rotate(rotation, expand=False)
+    if brightness != 1.0:
+        enhancer = ImageEnhance.Brightness(image)
+        image = enhancer.enhance(brightness)
+    buffer = BytesIO()
+    image.save(buffer, format="PNG", optimize=False)
+    return buffer.getvalue()
+
+
 class AckWatcher:
-    def __init__(self) -> None:
+    def __init__(self, verbose: bool) -> None:
         self.stage_one = asyncio.Event()
         self.stage_two = asyncio.Event()
         self.stage_three = asyncio.Event()
+        self.verbose = verbose
 
     def reset(self) -> None:
         self.stage_one.clear()
@@ -46,7 +62,8 @@ class AckWatcher:
 
     def handler(self, _sender: int, data: bytearray) -> None:
         payload = bytes(data)
-        print("NOTIF", bytes_to_hex(payload))
+        if self.verbose:
+            print("NOTIF", bytes_to_hex(payload))
         if payload == ACK_STAGE_ONE:
             self.stage_one.set()
         elif payload == ACK_STAGE_TWO:
@@ -55,28 +72,59 @@ class AckWatcher:
             self.stage_three.set()
 
 
-async def wait_for_ack(event: asyncio.Event, label: str) -> None:
+async def wait_for_ack(event: asyncio.Event, label: str, verbose: bool) -> None:
     try:
         await asyncio.wait_for(event.wait(), timeout=5.0)
-        print(label + "_OK")
+        if verbose:
+            print(label + "_OK")
     except asyncio.TimeoutError:
         print(label + "_TIMEOUT")
 
 
 class BleDisplaySession:
-    def __init__(self, address: str | None = None) -> None:
+    def __init__(
+        self,
+        address: Optional[str] = None,
+        auto_reconnect: bool = True,
+        reconnect_delay: float = 2.0,
+        rotation: int = 0,
+        brightness: float = 1.0,
+        mtu: int = 512,
+        log_notifications: bool = False,
+    ) -> None:
         resolved = address or DEFAULT_ADDRESS
         if not resolved:
             raise ValueError("Missing target address. Pass it explicitly or set BK_LIGHT_ADDRESS.")
         self.address = resolved
+        self.auto_reconnect = auto_reconnect
+        self.reconnect_delay = reconnect_delay
+        self.rotation = rotation
+        self.brightness = brightness
+        self.mtu = mtu
+        self.log_notifications = log_notifications
         self.client = BleakClient(resolved)
-        self.watcher = AckWatcher()
+        self.watcher = AckWatcher(log_notifications)
+
+    async def _connect(self) -> None:
+        while True:
+            try:
+                await self.client.connect()
+                if not self.client.is_connected:
+                    raise ConnectionError("Bluetooth link failed")
+                if self.mtu:
+                    try:
+                        await self.client.exchange_mtu(self.mtu)
+                    except Exception:
+                        pass
+                await self.client.start_notify(UUID_NOTIFY, self.watcher.handler)
+                return
+            except Exception as error:
+                if not self.auto_reconnect:
+                    raise error
+                await asyncio.sleep(self.reconnect_delay)
 
     async def __aenter__(self) -> "BleDisplaySession":
-        await self.client.connect()
-        if not self.client.is_connected:
-            raise ConnectionError("Bluetooth link failed")
-        await self.client.start_notify(UUID_NOTIFY, self.watcher.handler)
+        await self._connect()
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
@@ -88,20 +136,29 @@ class BleDisplaySession:
             await self.client.disconnect()
 
     async def send_png(self, png_bytes: bytes, delay: float = 0.2) -> None:
-        frame = build_frame(png_bytes)
+        processed = adjust_image(png_bytes, self.rotation, self.brightness)
+        frame = build_frame(processed)
         await self.send_frame(frame, delay)
 
     async def send_frame(self, frame: bytes, delay: float = 0.2) -> None:
-        self.watcher.reset()
-        await self.client.write_gatt_char(UUID_WRITE, HANDSHAKE_FIRST, response=False)
-        await wait_for_ack(self.watcher.stage_one, "HANDSHAKE_STAGE_ONE")
-        await asyncio.sleep(delay)
-        self.watcher.stage_two.clear()
-        await self.client.write_gatt_char(UUID_WRITE, HANDSHAKE_SECOND, response=False)
-        await wait_for_ack(self.watcher.stage_two, "HANDSHAKE_STAGE_TWO")
-        await asyncio.sleep(delay)
-        await self.client.write_gatt_char(UUID_WRITE, frame, response=True)
-        await wait_for_ack(self.watcher.stage_three, "FRAME_ACK")
-        await asyncio.sleep(delay)
-        await self.client.write_gatt_char(UUID_WRITE, FRAME_VALIDATION, response=False)
+        try:
+            self.watcher.reset()
+            await self.client.write_gatt_char(UUID_WRITE, HANDSHAKE_FIRST, response=False)
+            await wait_for_ack(self.watcher.stage_one, "HANDSHAKE_STAGE_ONE", self.log_notifications)
+            await asyncio.sleep(delay)
+            self.watcher.stage_two.clear()
+            await self.client.write_gatt_char(UUID_WRITE, HANDSHAKE_SECOND, response=False)
+            await wait_for_ack(self.watcher.stage_two, "HANDSHAKE_STAGE_TWO", self.log_notifications)
+            await asyncio.sleep(delay)
+            await self.client.write_gatt_char(UUID_WRITE, frame, response=True)
+            await wait_for_ack(self.watcher.stage_three, "FRAME_ACK", self.log_notifications)
+            await asyncio.sleep(delay)
+            await self.client.write_gatt_char(UUID_WRITE, FRAME_VALIDATION, response=False)
+        except Exception:
+            if self.auto_reconnect:
+                await asyncio.sleep(self.reconnect_delay)
+                await self._connect()
+                await self.send_frame(frame, delay)
+            else:
+                raise
 

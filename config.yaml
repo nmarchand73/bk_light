@@ -1,0 +1,58 @@
+device:
+  address: "F0:27:3C:1A:8B:C3"
+  auto_reconnect: true
+  reconnect_delay: 2.0
+  mtu: 512
+  rotate: 0
+  brightness: 0.85
+  timezone: auto
+
+panels:
+  tile_width: 32
+  tile_height: 32
+  layout:
+    columns: 1
+    rows: 1
+  list: ["F0:27:3C:1A:8B:C3"]
+
+display:
+  frame_interval: 5.0
+  max_retries: 3
+  log_notifications: true
+
+presets:
+  clock:
+    default:
+      format: 12h
+      theme: dark
+      color: "#E2E8FF"
+      accent: "#6E7DFF"
+      background: "#000000"
+      font: null
+      size: 20
+      interval: 0.5
+      dot_flashing: true
+      dot_flash_period: 1.0
+  text:
+    default:
+      color: "#FF0000"
+      background: "#000000"
+      font: null
+      size: 16
+      spacing: 1
+  image:
+    default:
+      mode: fit
+      rotate: 0
+      mirror: false
+      invert: false
+  counter:
+    default:
+      start: 0
+      count: 10
+      delay: 1.0
+
+runtime:
+  mode: clock
+  preset: default
+
