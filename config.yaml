@@ -2,7 +2,7 @@ device:
   address: "F0:27:3C:1A:8B:C3"
   auto_reconnect: true
   reconnect_delay: 2.0
-  mtu: 128
+  mtu: 2048
   rotate: 0
   brightness: 0.85
   timezone: auto
@@ -17,15 +17,16 @@ panels:
   list: ["F0:27:3C:1A:8B:C3"]
 
 display:
-  frame_interval: 5.0
+  frame_interval: 0.05
   max_retries: 3
-  log_notifications: true
+  log_notifications: false
+  antialias_text: false
 
 runtime:
   mode: text
   preset: marquee_left
   options:
-    text: "WELCOME"
+    text: "Puparia"
     color: "#00FFAA"
     background: "#000000"
     
@@ -38,10 +39,10 @@ presets:
       accent: "#6E7DFF"
       background: "#000000"
       font: null
-      size: 19
-      interval: 0.25
+      size: 20
+      interval: 0.5
       dot_flashing: true
-      dot_flash_period: 0.5
+      dot_flash_period: 1.0
   text:
     default:
       color: "#FF0000"
@@ -52,7 +53,6 @@ presets:
       mode: static
       direction: left
       speed: 24.0
-      step: 1
       gap: 32
       offset_x: 0
       offset_y: 0
@@ -62,8 +62,8 @@ presets:
       background: "#000000"
       mode: scroll
       direction: left
-      speed: 100.0
-      step: 1
+      speed: 30.0
+      step: 3
       gap: 32
       size: 18
       spacing: 2

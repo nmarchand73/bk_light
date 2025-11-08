@@ -50,7 +50,7 @@ class TextPreset:
     mode: str = "static"
     direction: str = "left"
     speed: float = 24.0
-    step: int = 2
+    step: Optional[int] = None
     gap: int = 32
     offset_x: int = 0
     offset_y: int = 0
@@ -89,6 +89,7 @@ class DisplayConfig:
     frame_interval: float = 5.0
     max_retries: int = 3
     log_notifications: bool = False
+    antialias_text: bool = True
 
 
 @dataclass
@@ -155,6 +156,7 @@ DEFAULTS: Dict[str, Any] = {
         "frame_interval": 5.0,
         "max_retries": 3,
         "log_notifications": False,
+        "antialias_text": True,
     },
     "presets": {
         "clock": {
@@ -181,7 +183,6 @@ DEFAULTS: Dict[str, Any] = {
                 "mode": "static",
                 "direction": "left",
                 "speed": 24.0,
-                "step": 2,
                 "gap": 32,
                 "offset_x": 0,
                 "offset_y": 0,
@@ -233,18 +234,30 @@ def _build_text_presets(data: Dict[str, Dict[str, Any]]) -> Dict[str, TextPreset
     for name, values in data.items():
         preset = TextPreset(**values)
         if preset.mode not in {"static", "scroll"}:
-            preset.mode = "static"
+            preset = replace(preset, mode="static")
         if preset.direction not in {"left", "right"}:
-            preset.direction = "left"
-        preset.speed = max(1.0, float(preset.speed))
-        preset.gap = max(0, int(preset.gap))
-        preset.offset_x = int(preset.offset_x)
-        preset.offset_y = int(preset.offset_y)
-        preset.interval = max(0.01, float(preset.interval))
-        preset.step = max(1, int(preset.step))
+            preset = replace(preset, direction="left")
+        speed = max(1.0, float(preset.speed))
+        gap = max(0, int(preset.gap))
+        offset_x = int(preset.offset_x)
+        offset_y = int(preset.offset_y)
+        interval = max(0.01, float(preset.interval))
+        if preset.step is None:
+            computed_step = max(1, int(round(speed * interval)))
+        else:
+            computed_step = max(1, int(preset.step))
+        preset = replace(
+            preset,
+            speed=speed,
+            gap=gap,
+            offset_x=offset_x,
+            offset_y=offset_y,
+            interval=interval,
+            step=computed_step,
+        )
         presets[name] = preset
     if "default" not in presets:
-        presets["default"] = TextPreset()
+        presets["default"] = TextPreset(step=max(1, int(round(24.0 * 0.05))))
     return presets
 
 
@@ -383,7 +396,7 @@ def clock_options(config: AppConfig, preset_name: str, overrides: Dict[str, Any]
 
 def text_options(config: AppConfig, preset_name: str, overrides: Dict[str, Any]) -> TextPreset:
     library = config.presets.text
-    base = library.get(preset_name) or library.get(config.runtime.preset) or library.get("default") or TextPreset()
+    base = library.get(preset_name) or library.get(config.runtime.preset) or library.get("default") or TextPreset(step=1)
     data = dict(base.__dict__)
     for key, value in overrides.items():
         if value is None or key not in data:
@@ -396,14 +409,24 @@ def text_options(config: AppConfig, preset_name: str, overrides: Dict[str, Any])
             data[key] = value
     preset = TextPreset(**data)
     if preset.mode not in {"static", "scroll"}:
-        preset.mode = "static"
+        preset = replace(preset, mode="static")
     if preset.direction not in {"left", "right"}:
-        preset.direction = "left"
-    preset.speed = max(1.0, float(preset.speed))
-    preset.gap = max(0, int(preset.gap))
-    preset.step = max(1, int(preset.step))
-    preset.interval = max(0.01, float(preset.interval))
-    return preset
+        preset = replace(preset, direction="left")
+    speed = max(1.0, float(preset.speed))
+    interval = max(0.01, float(preset.interval))
+    if preset.step is None:
+        computed_step = max(1, int(round(speed * interval)))
+    else:
+        computed_step = max(1, int(preset.step))
+    return replace(
+        preset,
+        speed=speed,
+        gap=max(0, int(preset.gap)),
+        offset_x=int(preset.offset_x),
+        offset_y=int(preset.offset_y),
+        interval=interval,
+        step=computed_step,
+    )
 
 
 def image_options(config: AppConfig, preset_name: str, overrides: Dict[str, Any]) -> ImagePreset:

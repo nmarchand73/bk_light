@@ -50,6 +50,8 @@ The tools assume the screen advertises as `LED_BLE_*` (BK-Light firmware). Updat
        address: "F0:27:3C:1A:8B:C3"
      panels:
        list: ["F0:27:3C:1A:8B:C3"]
+     display:
+       antialias_text: true  # set to false for crisp bitmap text
      ```
 
    - Multi-panel:

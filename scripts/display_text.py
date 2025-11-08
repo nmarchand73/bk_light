@@ -35,17 +35,31 @@ def load_font(path: Optional[Path], size: int) -> ImageFont.ImageFont:
         return ImageFont.load_default()
 
 
-def build_text_bitmap(text: str, font_path: Optional[Path], size: int, spacing: int, color: tuple[int, int, int]) -> Image.Image:
+def build_text_bitmap(
+    text: str,
+    font_path: Optional[Path],
+    size: int,
+    spacing: int,
+    color: tuple[int, int, int],
+    antialias: bool,
+) -> Image.Image:
     font = load_font(font_path, size)
     formatted = text.replace("\\n", "\n")
-    dummy = Image.new("L", (1, 1), 0)
-    draw = ImageDraw.Draw(dummy)
-    bbox = draw.multiline_textbbox((0, 0), formatted, font=font, spacing=spacing, align="left")
-    width = bbox[2] - bbox[0]
-    height = bbox[3] - bbox[1]
-    bitmap = Image.new("RGBA", (max(1, width), max(1, height)), (0, 0, 0, 0))
-    draw_bitmap = ImageDraw.Draw(bitmap)
-    draw_bitmap.multiline_text((-bbox[0], -bbox[1]), formatted, fill=(*color, 255), font=font, spacing=spacing, align="left")
+    dummy_mode = "L" if antialias else "1"
+    dummy = Image.new(dummy_mode, (1, 1), 0)
+    draw_dummy = ImageDraw.Draw(dummy)
+    bbox = draw_dummy.multiline_textbbox((0, 0), formatted, font=font, spacing=spacing, align="left")
+    width = max(1, bbox[2] - bbox[0])
+    height = max(1, bbox[3] - bbox[1])
+    mask_mode = "L" if antialias else "1"
+    mask = Image.new(mask_mode, (width, height), 0)
+    draw_mask = ImageDraw.Draw(mask)
+    draw_mask.multiline_text((-bbox[0], -bbox[1]), formatted, fill=255, font=font, spacing=spacing, align="left")
+    if not antialias:
+        mask = mask.convert("L")
+    bitmap = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    fill = Image.new("RGBA", (width, height), (*color, 255))
+    bitmap = Image.composite(fill, bitmap, mask)
     return bitmap
 
 
@@ -94,13 +108,20 @@ async def display_text(config: AppConfig, message: str, preset_name: str, overri
     color = parse_color(overrides.get("color")) or parse_color(preset.color)
     background = parse_color(overrides.get("background")) or parse_color(preset.background)
     font_path = Path(overrides["font"]) if overrides.get("font") else Path(preset.font) if preset.font else None
-    text_bitmap = build_text_bitmap(message, font_path, preset.size, preset.spacing, color)
+    text_bitmap = build_text_bitmap(
+        message,
+        font_path,
+        preset.size,
+        preset.spacing,
+        color,
+        config.display.antialias_text,
+    )
     try:
         async with PanelManager(config) as manager:
             canvas = manager.canvas_size
             if preset.mode == "scroll":
                 strip_width = max(1, text_bitmap.width + preset.gap)
-                step = max(1, int(preset.step if preset.step else max(1, int(preset.speed * max(preset.interval, 0.01)))))
+                step = max(1, int(preset.step))
                 position = 0
                 while True:
                     frame = render_scroll_frame(
