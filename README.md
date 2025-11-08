@@ -79,13 +79,14 @@ The tools assume the screen advertises as `LED_BLE_*` (BK-Light firmware). Updat
    ```bash
    python scripts/production.py --mode text --text "HELLO" --option color=#00FFAA
    ```
-5. Need to identify MAC ↔ panel placement? Run:
+5. Need to identify MAC ↔ panel placement or force a clean BLE reset? Run:
    ```bash
    python scripts/identify_panels.py
    ```
+   (Chaque panneau affiche un numéro puis se déconnecte proprement.)
 
 ## Toolkit Scripts
-- `scripts/clock_display.py` – async HH:MM clock (supports 12/24h, dot flashing, themes).
+- `scripts/clock_display.py` – async HH:MM clock (supports 12/24h, dot flashing, themes). Quittez avec `Ctrl+C` : la session BLE est fermée proprement, vous pouvez relancer immédiatement.
 - `scripts/display_text.py` – renders text using presets (colour/background/font/spacing).
 - `scripts/send_image.py` – uploads any image with fit/cover/scale + rotate/mirror/invert.
 - `scripts/increment_counter.py` – numeric animation for diagnostics.
@@ -99,7 +100,7 @@ Use Pillow to draw onto a canvas sized to `columns × rows` tiles, then:
 async with PanelManager(load_config()) as manager:
     await manager.send_image(image)
 ```
-`PanelManager` slices the image per tile and `BleDisplaySession` handles BLE writes/ACKs for each panel automatically.
+`PanelManager` slices the image per tile and `BleDisplaySession` handles BLE writes/ACKs for each panel automatically. Sessions se reconnectent automatiquement en cas de redémarrage du panneau (retries via `reconnect_delay` / `max_retries` / `scan_timeout`).
 
 ## Attribution & License
 - Created by Puparia — GitHub: [Pupariaa](https://github.com/Pupariaa).
