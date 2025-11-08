@@ -115,7 +115,7 @@ def build_clock_image(
         gap = digit_height * 0.35
         colon_column = int(round(colon_center_x))
         top = int(round(baseline - gap))
-        bottom = int(round(baseline + gap))
+        bottom = int(round(baseline + gap)) - 1
         colon_column = max(0, min(canvas[0] - 1, colon_column))
         if colon_visible:
             for row in (top, bottom):
