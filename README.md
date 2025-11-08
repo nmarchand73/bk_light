@@ -54,6 +54,18 @@ The tools assume the screen advertises as `LED_BLE_*` (BK-Light firmware). Updat
        antialias_text: true  # set to false for crisp bitmap text
      ```
 
+   - Fonts:
+
+     Place `.ttf` / `.otf` files under `assets/fonts/` and reference them by name (extension optional):
+
+     ```yaml
+     presets:
+       clock:
+         default:
+           font: "Aldo PC"     # resolves to assets/fonts/Aldo PC.ttf
+           size: 22
+     ```
+
    - Multi-panel:
 
      ```yaml

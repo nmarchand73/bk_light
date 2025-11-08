@@ -12,6 +12,7 @@ if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
 from bk_light.config import AppConfig, clock_options, load_config
+from bk_light.fonts import resolve_font
 from bk_light.panel_manager import PanelManager
 
 
@@ -134,7 +135,8 @@ async def run_clock(config: AppConfig, preset_name: str, overrides: dict[str, Op
     color = parse_color(overrides.get("color")) or parse_color(preset.color)
     accent = parse_color(overrides.get("accent")) or parse_color(preset.accent)
     background = parse_color(overrides.get("background")) or parse_color(preset.background)
-    font_path = Path(overrides["font"]) if overrides.get("font") else Path(preset.font) if preset.font else None
+    font_ref = overrides.get("font") or preset.font
+    font_path = resolve_font(font_ref)
     interval = preset.interval
     dot_flashing = preset.dot_flashing
     flash_period = preset.dot_flash_period

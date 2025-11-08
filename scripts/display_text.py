@@ -11,6 +11,7 @@ if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
 from bk_light.config import AppConfig, load_config, text_options
+from bk_light.fonts import resolve_font
 from bk_light.panel_manager import PanelManager
 
 
@@ -107,7 +108,8 @@ async def display_text(config: AppConfig, message: str, preset_name: str, overri
     preset = text_options(config, preset_name, overrides)
     color = parse_color(overrides.get("color")) or parse_color(preset.color)
     background = parse_color(overrides.get("background")) or parse_color(preset.background)
-    font_path = Path(overrides["font"]) if overrides.get("font") else Path(preset.font) if preset.font else None
+    font_ref = overrides.get("font") or preset.font
+    font_path = resolve_font(font_ref)
     text_bitmap = build_text_bitmap(
         message,
         font_path,

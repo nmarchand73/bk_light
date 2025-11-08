@@ -11,6 +11,7 @@ if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
 from bk_light.config import AppConfig, counter_options, load_config, text_options
+from bk_light.fonts import resolve_font
 from bk_light.panel_manager import PanelManager
 
 
@@ -70,7 +71,8 @@ async def run_counter(config: AppConfig, preset_name: str, overrides: dict[str, 
     text_preset = text_options(config, preset_name, {})
     color = parse_color(text_preset.color)
     background = parse_color(text_preset.background)
-    font_path = Path(text_preset.font) if text_preset.font else None
+    font_ref = text_preset.font
+    font_path = resolve_font(font_ref)
     size = text_preset.size
     start = overrides.get("start")
     count = overrides.get("count")
