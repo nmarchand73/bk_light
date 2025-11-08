@@ -68,22 +68,21 @@ def render_scroll_frame(
     text_bitmap: Image.Image,
     background: tuple[int, int, int],
     direction: str,
-    speed: float,
     gap: int,
     offset_x: int,
     offset_y: int,
-    elapsed: float,
+    position: int,
 ) -> Image.Image:
     strip_width = max(1, text_bitmap.width + gap)
     strip = Image.new("RGBA", (strip_width, canvas[1]), tuple(background) + (255,))
     y = (canvas[1] - text_bitmap.height) // 2 + offset_y
     strip.paste(text_bitmap, (0, y), text_bitmap)
-    shift = int((elapsed * speed) % strip_width)
-    base = offset_x - shift if direction == "left" else offset_x + shift
+    shift = position % strip_width
+    start = offset_x - shift if direction == "left" else offset_x + shift
+    while start > -strip_width:
+        start -= strip_width
     frame = Image.new("RGBA", canvas, tuple(background) + (255,))
-    x = base
-    while x > -strip_width:
-        x -= strip_width
+    x = start
     while x < canvas[0]:
         frame.paste(strip, (int(x), 0), strip)
         x += strip_width
@@ -100,23 +99,23 @@ async def display_text(config: AppConfig, message: str, preset_name: str, overri
         async with PanelManager(config) as manager:
             canvas = manager.canvas_size
             if preset.mode == "scroll":
-                loop = asyncio.get_running_loop()
-                start = loop.time()
+                strip_width = max(1, text_bitmap.width + preset.gap)
+                step = max(1, int(preset.step if preset.step else max(1, int(preset.speed * max(preset.interval, 0.01)))))
+                position = 0
                 while True:
-                    elapsed = loop.time() - start
                     frame = render_scroll_frame(
                         canvas,
                         text_bitmap,
                         background,
                         preset.direction,
-                        preset.speed,
                         preset.gap,
                         preset.offset_x,
                         preset.offset_y,
-                        elapsed,
+                        position,
                     )
                     await manager.send_image(frame, delay=0.1)
                     await asyncio.sleep(preset.interval)
+                    position = (position + step) % strip_width
             else:
                 frame = render_static_frame(
                     canvas,
@@ -148,6 +147,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--direction", choices=("left", "right"))
     parser.add_argument("--speed", type=float)
     parser.add_argument("--gap", type=int)
+    parser.add_argument("--step", type=int)
     parser.add_argument("--offset-x", type=int)
     parser.add_argument("--offset-y", type=int)
     parser.add_argument("--interval", type=float)
@@ -165,6 +165,7 @@ def build_override_map(args: argparse.Namespace) -> dict[str, Optional[str]]:
         "direction": args.direction,
         "speed": args.speed,
         "gap": args.gap,
+        "step": args.step,
         "offset_x": args.offset_x,
         "offset_y": args.offset_y,
         "interval": args.interval,

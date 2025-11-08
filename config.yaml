@@ -22,9 +22,13 @@ display:
   log_notifications: true
 
 runtime:
-  mode: clock
-  preset: default
-
+  mode: text
+  preset: marquee_left
+  options:
+    text: "WELCOME"
+    color: "#00FFAA"
+    background: "#000000"
+    
 presets:
   clock:
     default:
@@ -48,6 +52,7 @@ presets:
       mode: static
       direction: left
       speed: 24.0
+      step: 1
       gap: 32
       offset_x: 0
       offset_y: 0
@@ -58,6 +63,7 @@ presets:
       mode: scroll
       direction: left
       speed: 30.0
+      step: 3
       gap: 32
       size: 18
       spacing: 2
@@ -69,6 +75,7 @@ presets:
       mode: scroll
       direction: right
       speed: 20.0
+      step: 2
       gap: 48
       size: 20
       spacing: 1

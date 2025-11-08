@@ -50,6 +50,7 @@ class TextPreset:
     mode: str = "static"
     direction: str = "left"
     speed: float = 24.0
+    step: int = 2
     gap: int = 32
     offset_x: int = 0
     offset_y: int = 0
@@ -180,6 +181,7 @@ DEFAULTS: Dict[str, Any] = {
                 "mode": "static",
                 "direction": "left",
                 "speed": 24.0,
+                "step": 2,
                 "gap": 32,
                 "offset_x": 0,
                 "offset_y": 0,
@@ -239,6 +241,7 @@ def _build_text_presets(data: Dict[str, Dict[str, Any]]) -> Dict[str, TextPreset
         preset.offset_x = int(preset.offset_x)
         preset.offset_y = int(preset.offset_y)
         preset.interval = max(0.01, float(preset.interval))
+        preset.step = max(1, int(preset.step))
         presets[name] = preset
     if "default" not in presets:
         presets["default"] = TextPreset()
@@ -385,7 +388,7 @@ def text_options(config: AppConfig, preset_name: str, overrides: Dict[str, Any])
     for key, value in overrides.items():
         if value is None or key not in data:
             continue
-        if key in {"size", "spacing", "gap", "offset_x", "offset_y"}:
+        if key in {"size", "spacing", "gap", "offset_x", "offset_y", "step"}:
             data[key] = int(value)
         elif key in {"speed", "interval"}:
             data[key] = float(value)
@@ -398,6 +401,7 @@ def text_options(config: AppConfig, preset_name: str, overrides: Dict[str, Any])
         preset.direction = "left"
     preset.speed = max(1.0, float(preset.speed))
     preset.gap = max(0, int(preset.gap))
+    preset.step = max(1, int(preset.step))
     preset.interval = max(0.01, float(preset.interval))
     return preset
 
