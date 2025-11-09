@@ -132,44 +132,12 @@ def build_clock_image(
         frame.alpha_composite(right_segment, (right_x, origin_y))
     frame_rgb = frame.convert("RGB")
     if right_text:
-        baseline = origin_y - digit_top
+        baseline = origin_y - digit_top + digit_height / 2
         gap = digit_height * 0.35
-        colon_column = origin_x + left_segment.width
-        colon_column = max(0, min(canvas[0] - 1, colon_column))
-        top = int(round(baseline - gap)) + 7
-        bottom = int(round(baseline + gap)) + 6
-
-        # aldopc
-        # top = int(round(baseline - gap)) + 7
-        # bottom = int(round(baseline + gap)) + 8
-
-        #kenyancoffeerg
-        # colon_column = origin_x + left_segment.width +1
-        # colon_column = max(0, min(canvas[0] - 1, colon_column))
-        # top = int(round(baseline - gap)) + 8
-        # bottom = int(round(baseline + gap)) + 9
-
-        # kimberleybl
-        # colon_column = origin_x + left_segment.width
-        # colon_column = max(0, min(canvas[0] - 1, colon_column))
-        # top = int(round(baseline - gap)) + 7
-        # bottom = int(round(baseline + gap)) + 6
-
-
-
-        if colon_visible:
-            for row in (top, bottom):
-                if 0 <= row < canvas[1]:
-                    frame_rgb.putpixel((colon_column, row), accent)
-        else:
-            for row in range(top, bottom + 1):
-                if 0 <= row < canvas[1]:
-                    frame_rgb.putpixel((colon_column, row), background)
-    if right_text:
-        colon_column = origin_x + left_segment.width + colon_dx
-        colon_column = max(0, min(canvas[0] - 1, colon_column))
         base_top = int(round(baseline - gap))
         base_bottom = int(round(baseline + gap))
+        colon_column = origin_x + left_segment.width + colon_dx
+        colon_column = max(0, min(canvas[0] - 1, colon_column))
         top = base_top + colon_top_adjust
         bottom = base_bottom + colon_bottom_adjust
         if bottom < top:

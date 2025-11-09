@@ -44,7 +44,7 @@ presets:
       color: "#E2E8FF"
       accent: "#6E7DFF"
       background: "#000000"
-      font: "kimberleybl"
+      font: "kenyancoffeerg"
       interval: 0.5
       dot_flashing: true
       dot_flash_period: 1.0

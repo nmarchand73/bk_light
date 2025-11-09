@@ -18,16 +18,16 @@ class FontProfile:
     offset_x: int = 0
     offset_y: int = 0
     colon_dx: int = 0
-    colon_top_adjust: int = 0
-    colon_bottom_adjust: int = -1
+    colon_top_adjust: int = 7
+    colon_bottom_adjust: int = 6
 
 
 FONT_PROFILES: dict[str, FontProfile] = {
-    "aldopc": FontProfile(recommended_size=16, offset_x=1, offset_y=-1, colon_top_adjust=7, colon_bottom_adjust=8),
+    "aldopc": FontProfile(recommended_size=16, offset_x=1, offset_y=-1, colon_bottom_adjust=8),
     "caviardreams": FontProfile(recommended_size=16),
     "dolcevitalight": FontProfile(recommended_size=14),
     "kenyancoffeerg": FontProfile(recommended_size=15, offset_y=-1, colon_dx=1, colon_top_adjust=8, colon_bottom_adjust=9),
-    "kimberleybl": FontProfile(recommended_size=11, offset_y=-1, colon_top_adjust=7, colon_bottom_adjust=6),
+    "kimberleybl": FontProfile(recommended_size=11, offset_y=-1),
 }
 
 
