@@ -4,7 +4,7 @@ device:
   reconnect_delay: 2.0
   mtu: 2048
   rotate: 0
-  brightness: 0.85
+  brightness: 0.15
   timezone: auto
   scan_timeout: 6.0
 
@@ -22,14 +22,6 @@ display:
   log_notifications: false
   antialias_text: false
 
-# runtime:
-#   mode: text
-#   preset: marquee_left
-#   options:
-#     text: "Puparia"
-#     color: "#00FFAA"
-#     background: "#000000"
-
 runtime:
   mode: clock
   preset: default
@@ -44,7 +36,7 @@ presets:
       color: "#E2E8FF"
       accent: "#6E7DFF"
       background: "#000000"
-      font: "kenyancoffeerg"
+      font: "aldopc"
       interval: 0.5
       dot_flashing: true
       dot_flash_period: 1.0

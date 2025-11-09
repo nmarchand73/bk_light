@@ -177,11 +177,10 @@ The tools assume the screen advertises as `LED_BLE_*` (BK-Light firmware). Updat
 - `scripts/list_fonts.py`
 
   Prints the fonts resolved from `assets/fonts/`. Bundled names and defaults:
-  - `Aldo PC` → size 16, offset (+1, -1), colon (top +7, bottom +8)
-  - `CaviarDreams` → size 16
-  - `Dolce Vita Light` → size 14
-  - `Kenyan Coffee Rg` → size 15, offset (0, -1), colon (dx +1, top +8, bottom +9)
-  - `Kimberley Bl` → size 11, offset (0, -1), colon (top +7, bottom +6)
+  - `Aldo PC`
+  - `Dolce Vita Light`
+  - `Kenyan Coffee Rg`
+  - `Kimberley Bl`
 
   ```bash
   python scripts/list_fonts.py [--config config.yaml]
