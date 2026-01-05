@@ -16,7 +16,6 @@ from pathlib import Path
 
 try:
     import websockets
-    from websockets.server import serve as ws_serve
 except ImportError:
     print("Error: websockets library required")
     print("Install with: pip install websockets")
@@ -226,17 +225,25 @@ async def handle_http(reader, writer):
         data = await reader.read(4096)
         request = data.decode("utf-8", errors="ignore")
 
-        if "GET / " in request or "GET /snake.html" in request:
+        path = None
+        for line in request.split("\n"):
+            if line.startswith("GET "):
+                parts = line.split()
+                if len(parts) >= 2:
+                    path = parts[1]
+                break
+
+        if path in ("/", "/snake.html"):
             if HTML_FILE.exists():
                 content = HTML_FILE.read_bytes()
-                response = (
-                    b"HTTP/1.1 200 OK\r\n"
-                    b"Content-Type: text/html; charset=utf-8\r\n"
-                    b"Content-Length: " + str(len(content)).encode() + b"\r\n"
-                    b"Connection: close\r\n\r\n" + content
-                )
             else:
-                response = b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\nsnake.html not found"
+                content = b"<!DOCTYPE html><html><head><title>BLE Panel Server</title></head><body><h1>BLE Panel Server</h1><p>Server is running. snake.html not found.</p></body></html>"
+            response = (
+                b"HTTP/1.1 200 OK\r\n"
+                b"Content-Type: text/html; charset=utf-8\r\n"
+                b"Content-Length: " + str(len(content)).encode() + b"\r\n"
+                b"Connection: close\r\n\r\n" + content
+            )
         else:
             response = b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\nNot found"
 
@@ -272,7 +279,7 @@ async def main():
     print(f"HTTP server: http://localhost:{args.port}/")
 
     # Start WebSocket server
-    ws_server = await ws_serve(handle_websocket, "0.0.0.0", args.ws_port)
+    ws_server = await websockets.serve(handle_websocket, "0.0.0.0", args.ws_port)
     print(f"WebSocket server: ws://localhost:{args.ws_port}/")
 
     print(f"\nOpen http://localhost:{args.port} in your browser to play Snake!")
