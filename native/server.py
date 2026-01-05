@@ -18,27 +18,63 @@ if str(project_root) not in sys.path:
 
 from bk_light.display_session import BleDisplaySession, build_frame
 
-HTML_FILE = Path(__file__).parent / "snake.html"
 MIN_FRAME_INTERVAL = 0.08
 
+panel_address = None
 panel = None
 last_frame_time = 0
 
 
+def is_valid_png(data: bytes) -> bool:
+    return len(data) >= 8 and data[:8] == b"\x89PNG\r\n\x1a\n"
+
+
 async def handle_websocket(websocket):
-    global last_frame_time
+    global panel, last_frame_time
     print(f"Client connected: {websocket.remote_address}")
+    
+    if not panel:
+        panel = BleDisplaySession(
+            address=panel_address,
+            auto_reconnect=True,
+            log_notifications=False,
+        )
+        try:
+            await panel._connect()
+            print("Connected to panel")
+        except Exception as e:
+            print(f"Failed to connect to panel: {e}")
+            await websocket.close()
+            return
+    
     try:
         async for message in websocket:
-            if isinstance(message, bytes) and panel:
-                now = asyncio.get_event_loop().time()
-                if now - last_frame_time >= MIN_FRAME_INTERVAL:
-                    last_frame_time = now
+            if not isinstance(message, bytes) or not panel:
+                continue
+            if not is_valid_png(message):
+                continue
+            now = asyncio.get_event_loop().time()
+            if now - last_frame_time >= MIN_FRAME_INTERVAL:
+                last_frame_time = now
+                try:
                     frame = build_frame(message)
                     await panel.send_frame(frame, delay=0.1)
+                except Exception as e:
+                    print(f"Error sending frame: {e}")
+                    if "not connected" in str(e).lower() or "disconnected" in str(e).lower():
+                        try:
+                            await panel._connect()
+                        except:
+                            pass
     except websockets.exceptions.ConnectionClosed:
         pass
-    print(f"Client disconnected: {websocket.remote_address}")
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+    finally:
+        if panel:
+            await panel._safe_disconnect()
+            panel = None
+        print(f"Client disconnected: {websocket.remote_address}")
 
 
 async def handle_http(reader, writer):
@@ -54,11 +90,8 @@ async def handle_http(reader, writer):
                     path = parts[1]
                 break
 
-        if path in ("/", "/snake.html"):
-            if HTML_FILE.exists():
-                content = HTML_FILE.read_bytes()
-            else:
-                content = b"<!DOCTYPE html><html><head><title>BLE Panel Server</title></head><body><h1>BLE Panel Server</h1><p>Server is running. snake.html not found.</p></body></html>"
+        if path == "/":
+            content = b"<!DOCTYPE html><html><head><title>BLE Panel Server</title></head><body><h1>BLE Panel Server</h1><p>Server is running. Connect via WebSocket to send frames.</p></body></html>"
             response = (
                 b"HTTP/1.1 200 OK\r\n"
                 b"Content-Type: text/html; charset=utf-8\r\n"
@@ -78,7 +111,7 @@ async def handle_http(reader, writer):
 
 
 async def main():
-    global panel
+    global panel_address
 
     parser = argparse.ArgumentParser()
     parser.add_argument("address")
@@ -87,21 +120,15 @@ async def main():
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
-    panel = BleDisplaySession(
-        address=args.address,
-        auto_reconnect=True,
-        log_notifications=args.verbose,
-    )
+    panel_address = args.address
 
     try:
-        await panel._connect()
-        print("Connected to panel")
-
         http_server = await asyncio.start_server(handle_http, "0.0.0.0", args.port)
         print(f"HTTP: http://localhost:{args.port}/")
 
         ws_server = await websockets.serve(handle_websocket, "0.0.0.0", args.ws_port)
         print(f"WebSocket: ws://localhost:{args.ws_port}/")
+        print("Waiting for WebSocket client... (panel will connect on first client)")
 
         await asyncio.gather(
             http_server.serve_forever(),
@@ -110,7 +137,8 @@ async def main():
     except KeyboardInterrupt:
         pass
     finally:
-        await panel._safe_disconnect()
+        if panel:
+            await panel._safe_disconnect()
 
 
 if __name__ == "__main__":
