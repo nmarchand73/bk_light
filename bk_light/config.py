@@ -3,7 +3,6 @@ import os
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Dict, Optional
-import yaml
 
 
 def _clamp(value: float, lower: float, upper: float) -> float:
@@ -13,6 +12,10 @@ def _clamp(value: float, lower: float, upper: float) -> float:
 def _load_yaml(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return {}
+    try:
+        import yaml
+    except ImportError:
+        raise ImportError("PyYAML is required. Install it with: pip install PyYAML")
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
