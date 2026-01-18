@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m py_compile:*)",
+      "Bash(python scripts/fft_vu_meter.py:*)",
+      "Bash(python:*)",
+      "WebSearch",
+      "WebFetch(domain:overscore.media)",
+      "WebFetch(domain:rafalwilinski.medium.com)",
+      "WebFetch(domain:www.instructables.com)",
+      "WebFetch(domain:imaginary-institute.com)",
+      "WebFetch(domain:hackster.imgix.net)",
+      "Bash(pip install:*)",
+      "WebFetch(domain:www.france24.com)",
+      "Bash(pyinstaller:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd new animation scripts and radar clock with news ticker\n\nNew scripts:\n- radar_animation.py: Radar clock with France Info RSS news ticker\n- galaxy_animation.py, particle_sea.py, perlin_flame.py: Visual effects\n- fft_vu_meter.py: Audio-reactive frequency visualizer\n- play_gif.py: Animated GIF player\n- setup_device.py: BLE device scanner\n- Various other animation scripts\n\nFeatures in radar_animation:\n- Radar sweep with configurable speed and trail\n- Clock with pixel font and blinking colon\n- Rainbow colored scrolling news from France Info\n- Auto-fallback to preview mode if no config\nEOF\n\\)\")",
+      "Bash(git remote:*)"
+    ]
+  }
+}
