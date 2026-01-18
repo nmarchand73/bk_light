@@ -1,49 +1,45 @@
 device:
-  address: "F0:27:3C:1A:8B:C3"
+  address: 62:27:11:EB:FE:1A
   auto_reconnect: true
   reconnect_delay: 2.0
   mtu: 2048
   rotate: 0
-  brightness: 0.15
+  brightness: 1.0
   timezone: auto
   scan_timeout: 6.0
-
 panels:
   tile_width: 32
   tile_height: 32
   layout:
     columns: 1
     rows: 1
-  list: ["F0:27:3C:1A:8B:C3"]
-
+  list: []
 display:
   frame_interval: 0.05
   max_retries: 3
   log_notifications: false
   antialias_text: false
-
 runtime:
   mode: clock
   preset: default
   options:
-    timezone: "Europe/Paris"
-    
+    timezone: Europe/Paris
 presets:
   clock:
     default:
       format: 24h
       theme: dark
-      color: "#E2E8FF"
-      accent: "#6E7DFF"
-      background: "#000000"
-      font: "aldopc"
+      color: '#E2E8FF'
+      accent: '#6E7DFF'
+      background: '#000000'
+      font: aldopc
       interval: 0.5
       dot_flashing: true
       dot_flash_period: 1.0
   text:
     default:
-      color: "#FF0000"
-      background: "#000000"
+      color: '#FF0000'
+      background: '#000000'
       font: null
       size: 18
       spacing: 1
@@ -55,8 +51,8 @@ presets:
       offset_y: 0
       interval: 0.05
     marquee_left:
-      color: "#00FFAA"
-      background: "#000000"
+      color: '#00FFAA'
+      background: '#000000'
       mode: scroll
       direction: left
       speed: 30.0
@@ -67,8 +63,8 @@ presets:
       offset_y: 0
       interval: 0.04
     marquee_right:
-      color: "#FFFFFF"
-      background: "#000000"
+      color: '#FFFFFF'
+      background: '#000000'
       mode: scroll
       direction: right
       speed: 20.0
@@ -89,5 +85,3 @@ presets:
       start: 0
       count: 10
       delay: 1.0
-
-

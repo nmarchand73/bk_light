@@ -75,9 +75,9 @@ class AckWatcher:
             self.stage_three.set()
 
 
-async def wait_for_ack(event: asyncio.Event, label: str, verbose: bool) -> None:
+async def wait_for_ack(event: asyncio.Event, label: str, verbose: bool, timeout: float = 5.0) -> None:
     try:
-        await asyncio.wait_for(event.wait(), timeout=5.0)
+        await asyncio.wait_for(event.wait(), timeout=timeout)
         if verbose:
             print(label + "_OK")
     except asyncio.TimeoutError as timeout_error:
@@ -113,6 +113,7 @@ class BleDisplaySession:
         self.scan_timeout = scan_timeout
         self.client: Optional[BleakClient] = None
         self.watcher = AckWatcher(log_notifications)
+        self._skip_stage_two: Optional[bool] = None  # Learned from first frame
 
     async def _safe_disconnect(self) -> None:
         if self.client is None:
@@ -201,7 +202,8 @@ class BleDisplaySession:
                 self.watcher.reset()
                 await self.client.write_gatt_char(UUID_WRITE, HANDSHAKE_FIRST, response=False)
                 await wait_for_ack(self.watcher.stage_one, "HANDSHAKE_STAGE_ONE", self.log_notifications)
-                await asyncio.sleep(delay)
+                if delay > 0:
+                    await asyncio.sleep(delay)
                 self.watcher.stage_two.clear()
                 skip_stage_two = False
                 try:
@@ -212,13 +214,14 @@ class BleDisplaySession:
                     if self.log_notifications:
                         print("HANDSHAKE_STAGE_TWO_SKIPPED")
                 else:
-                    await asyncio.sleep(delay)
-                if skip_stage_two:
+                    if delay > 0:
+                        await asyncio.sleep(delay)
+                if skip_stage_two and delay > 0:
                     await asyncio.sleep(delay)
                 await self.client.write_gatt_char(UUID_WRITE, frame, response=True)
                 await wait_for_ack(self.watcher.stage_three, "FRAME_ACK", self.log_notifications)
-                await asyncio.sleep(delay)
-                # await self.client.write_gatt_char(UUID_WRITE, FRAME_VALIDATION, response=False)
+                if delay > 0:
+                    await asyncio.sleep(delay)
                 return
             except (asyncio.TimeoutError, BleakError, ConnectionError) as error:
                 if not self.auto_reconnect or attempt > self.max_retries:
@@ -227,6 +230,57 @@ class BleDisplaySession:
                 await self._safe_disconnect()
                 await asyncio.sleep(self.reconnect_delay)
             except Exception as error:
+                if not self.auto_reconnect or attempt > self.max_retries:
+                    await self._safe_disconnect()
+                    raise error
+                await self._safe_disconnect()
+                await asyncio.sleep(self.reconnect_delay)
+
+    async def send_frame_streaming(self, frame: bytes) -> None:
+        """Optimized frame send for streaming with minimum latency.
+
+        - Uses short timeout (0.3s) for stage two instead of 5s
+        - Learns to skip stage two after first frame if device doesn't respond
+        - No inter-stage delays
+        """
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                await self._ensure_connected()
+                self.watcher.reset()
+
+                # Stage 1
+                await self.client.write_gatt_char(UUID_WRITE, HANDSHAKE_FIRST, response=False)
+                await wait_for_ack(self.watcher.stage_one, "HANDSHAKE_STAGE_ONE", self.log_notifications)
+
+                # Stage 2 - use short timeout, always send but skip waiting if learned
+                self.watcher.stage_two.clear()
+                await self.client.write_gatt_char(UUID_WRITE, HANDSHAKE_SECOND, response=False)
+                if self._skip_stage_two is not True:
+                    try:
+                        # Short timeout for streaming (0.3s instead of 5s)
+                        await wait_for_ack(self.watcher.stage_two, "HANDSHAKE_STAGE_TWO", self.log_notifications, timeout=0.3)
+                        self._skip_stage_two = False
+                    except asyncio.TimeoutError:
+                        self._skip_stage_two = True
+                        if self.log_notifications:
+                            print("HANDSHAKE_STAGE_TWO_SKIPPED (will skip wait for future frames)")
+
+                # Send frame - keep response=True as device requires it
+                await self.client.write_gatt_char(UUID_WRITE, frame, response=True)
+                await wait_for_ack(self.watcher.stage_three, "FRAME_ACK", self.log_notifications)
+                return
+
+            except (asyncio.TimeoutError, BleakError, ConnectionError) as error:
+                self._skip_stage_two = None  # Reset learning on error
+                if not self.auto_reconnect or attempt > self.max_retries:
+                    await self._safe_disconnect()
+                    raise error
+                await self._safe_disconnect()
+                await asyncio.sleep(self.reconnect_delay)
+            except Exception as error:
+                self._skip_stage_two = None
                 if not self.auto_reconnect or attempt > self.max_retries:
                     await self._safe_disconnect()
                     raise error

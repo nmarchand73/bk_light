@@ -2,10 +2,10 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from io import BytesIO
-from typing import List, Optional
+from typing import List, Optional, Union
 from PIL import Image
 from .config import AppConfig, PanelDescriptor
-from .display_session import BleDisplaySession
+from .display_session import BleDisplaySession, adjust_image, build_frame
 
 
 @dataclass
@@ -110,4 +110,79 @@ class PanelManager:
             region.save(buffer, format="PNG", optimize=False)
             tasks.append(panel_session.session.send_png(buffer.getvalue(), delay))
         await asyncio.gather(*tasks)
+
+    def prebuffer_image(self, image: Image.Image) -> Union[bytes, List[bytes]]:
+        """Pre-convert a PIL Image to ready-to-send frame bytes.
+
+        Returns a single bytes object for single-panel mode, or a list of bytes
+        for multi-panel mode (one per panel in session order).
+        """
+        if self.multi_panel:
+            return self._prebuffer_multi(image)
+        else:
+            png_bytes = self._compress_png(image)
+            session = self.sessions[0].session
+            processed = adjust_image(png_bytes, session.rotation, session.brightness)
+            return build_frame(processed)
+
+    def _compress_png(self, image: Image.Image) -> bytes:
+        """Compress image to PNG with optimal settings for BLE transfer."""
+        # Convert to RGB if needed (remove alpha for smaller size)
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+
+        # Reduce colors for smaller PNG (quantize to 64 colors)
+        image = image.quantize(colors=64, method=Image.Quantize.FASTOCTREE).convert("RGB")
+
+        buffer = BytesIO()
+        image.save(buffer, format="PNG", optimize=True, compress_level=9)
+        return buffer.getvalue()
+
+    def _prebuffer_multi(self, image: Image.Image) -> List[bytes]:
+        expected_width, expected_height = self.canvas_size
+        if image.size != (expected_width, expected_height):
+            image = image.resize((expected_width, expected_height))
+        frames = []
+        for panel_session in self.sessions:
+            descriptor = panel_session.descriptor
+            if descriptor is None:
+                continue
+            left = descriptor.grid_x * self.tile_width
+            top = descriptor.grid_y * self.tile_height
+            right = left + self.tile_width
+            bottom = top + self.tile_height
+            region = image.crop((left, top, right, bottom))
+            png_bytes = self._compress_png(region)
+            session = panel_session.session
+            processed = adjust_image(png_bytes, session.rotation, session.brightness)
+            frames.append(build_frame(processed))
+        return frames
+
+    def prebuffer_images(self, images: List[Image.Image]) -> List[Union[bytes, List[bytes]]]:
+        """Pre-convert a list of PIL Images to ready-to-send frame bytes."""
+        return [self.prebuffer_image(img) for img in images]
+
+    async def send_prebuffered(self, frame_data: Union[bytes, List[bytes]], delay: float = 0.2) -> None:
+        """Send pre-buffered frame data without any conversion."""
+        if self.multi_panel:
+            tasks = []
+            for i, panel_session in enumerate(self.sessions):
+                if panel_session.descriptor is None:
+                    continue
+                tasks.append(panel_session.session.send_frame(frame_data[i], delay))
+            await asyncio.gather(*tasks)
+        else:
+            await self.sessions[0].session.send_frame(frame_data, delay)
+
+    async def send_prebuffered_streaming(self, frame_data: Union[bytes, List[bytes]]) -> None:
+        """Send pre-buffered frame with minimum latency for streaming."""
+        if self.multi_panel:
+            tasks = []
+            for i, panel_session in enumerate(self.sessions):
+                if panel_session.descriptor is None:
+                    continue
+                tasks.append(panel_session.session.send_frame_streaming(frame_data[i]))
+            await asyncio.gather(*tasks)
+        else:
+            await self.sessions[0].session.send_frame_streaming(frame_data)
 

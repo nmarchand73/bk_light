@@ -2,3 +2,10 @@ bleak
 Pillow
 PyYAML
 
+# Optional: for FFT VU meter
+numpy
+sounddevice
+
+# Optional: for CPU monitoring in radar animation
+psutil
+
